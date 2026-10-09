@@ -1,7 +1,7 @@
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { createTaskRecord, updateTaskRecord } from './tasks.js';
+import { createTaskRecord, updateTaskRecord, validateTaskInput } from './tasks.js';
 
 export class JsonTaskRepository {
   #tasks = new Map();
@@ -26,12 +26,14 @@ export class JsonTaskRepository {
       return this;
     }
 
-    const records = JSON.parse(contents);
-    if (!Array.isArray(records) || records.some((task) => !task || typeof task.id !== 'string' || typeof task.title !== 'string')) {
-      throw new Error(`Task data at ${this.filePath} has an invalid format`);
+    try {
+      const records = JSON.parse(contents);
+      this.#validateRecords(records);
+      this.#tasks = new Map(records.map((task) => [task.id, task]));
+    } catch (error) {
+      if (!(error instanceof SyntaxError) && error.name !== 'PersistedTaskDataError') throw error;
+      await this.#recoverCorruptData(error);
     }
-    this.#tasks = new Map(records.map((task) => [task.id, task]));
-    if (this.#tasks.size !== records.length) throw new Error(`Task data at ${this.filePath} contains duplicate IDs`);
     return this;
   }
 
@@ -85,6 +87,38 @@ export class JsonTaskRepository {
     return pending;
   }
 
+  #validateRecords(records) {
+    if (!Array.isArray(records)) throw persistedDataError('The saved value must be an array.');
+    const seenIds = new Set();
+    for (const task of records) {
+      if (!task || typeof task !== 'object' || Array.isArray(task)) {
+        throw persistedDataError('Every saved task must be an object.');
+      }
+      const { id, createdAt, updatedAt, ...fields } = task;
+      if (typeof id !== 'string' || !id || seenIds.has(id)) {
+        throw persistedDataError('Every saved task must have a unique non-empty ID.');
+      }
+      if (!isValidTimestamp(createdAt) || !isValidTimestamp(updatedAt)) {
+        throw persistedDataError(`Task ${id} has an invalid timestamp.`);
+      }
+      try {
+        validateTaskInput(fields);
+      } catch (error) {
+        throw persistedDataError(`Task ${id} is invalid: ${error.message}`);
+      }
+      seenIds.add(id);
+    }
+  }
+
+  async #recoverCorruptData(cause) {
+    const quarantinePath = `${this.filePath}.corrupt-${Date.now()}-${process.pid}-${randomUUID()}`;
+    await rename(this.filePath, quarantinePath);
+    const seeded = this.seedTasks.map((input) => createTaskRecord(input));
+    this.#tasks = new Map(seeded.map((task) => [task.id, task]));
+    await this.#persist(this.#tasks);
+    console.warn(`Sprintboard recovered invalid task data (${cause.message}). Original data preserved at ${quarantinePath}`);
+  }
+
   async #persist(tasks) {
     const temporaryPath = `${this.filePath}.${process.pid}.${randomUUID()}.tmp`;
     try {
@@ -95,4 +129,14 @@ export class JsonTaskRepository {
       throw error;
     }
   }
+}
+
+function persistedDataError(message) {
+  const error = new Error(message);
+  error.name = 'PersistedTaskDataError';
+  return error;
+}
+
+function isValidTimestamp(value) {
+  return typeof value === 'string' && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
 }

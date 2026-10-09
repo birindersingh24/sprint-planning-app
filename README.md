@@ -12,7 +12,7 @@ A small full-stack sprint board for evaluating Codzee's GitHub pull-request revi
 npm start
 ```
 
-Open `http://localhost:3000`. The app seeds example tasks into `data/tasks.json` on first launch and keeps changes across restarts. Set `PORT` to use another port, or `DATA_FILE` to choose a different data file.
+Open `http://localhost:3000`. The app seeds example tasks into `data/tasks.json` on first launch and keeps changes across restarts. If the saved JSON is malformed or task records fail validation, startup moves the original file to a uniquely named `*.corrupt-*` file beside it, writes a fresh seed file, and logs the recovery path. Review or restore the quarantined file before deleting it. Set `PORT` to use another port, or `DATA_FILE` to choose a different data file.
 
 ## Test it
 
@@ -56,7 +56,7 @@ Connect Codzee to this public repository, then implement each exercise on a sepa
 
 1. **Feature (implemented on `feature/due-date-agenda`):** Add due-date sorting and a calendar/agenda view, including accessible sorting controls and tests for missing and past dates.
 2. **Bug fix:** Add optimistic concurrency using an `updatedAt` precondition so two browser sessions cannot silently overwrite each other's edits. Cover stale and current updates at the API level.
-3. **Hardening:** Validate and recover from malformed persisted data without overwriting the original file; add a clear startup diagnostic and tests for corrupt, truncated, and structurally invalid records.
+3. **Hardening (implemented on `fix/corrupt-data-recovery`):** Validate and recover from malformed persisted data without overwriting the original file; add a clear startup diagnostic and tests for corrupt, truncated, and structurally invalid records.
 
 These exercises cover UI behavior, API contracts, and filesystem/data-integrity handling. For each PR, compare Codzee's findings with the tests and your own review. Record useful comments, false positives, missed issues, review latency, and confusing workflow steps. Verify findings yourself; do not treat generated reviews as authoritative.
 
