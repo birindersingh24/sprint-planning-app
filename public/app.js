@@ -185,6 +185,7 @@ function closeTaskDialog() {
 async function saveTask(event) {
   event.preventDefault();
   const id = document.querySelector('#task-id').value;
+  const currentTask = id ? tasks.find((task) => task.id === id) : null;
   const payload = {
     title: document.querySelector('#task-title').value,
     description: document.querySelector('#task-description').value,
@@ -196,8 +197,10 @@ async function saveTask(event) {
   };
 
   try {
+    if (id && !currentTask) throw new Error('This task is no longer in the current results. Clear filters and reload it before saving.');
     await requestJson(id ? `/api/tasks/${escapePathSegment(id)}` : '/api/tasks', {
       method: id ? 'PATCH' : 'POST',
+      ...(id ? { headers: { 'if-match': `"${currentTask.updatedAt}"` } } : {}),
       body: JSON.stringify(payload),
     });
     closeTaskDialog();
@@ -227,7 +230,11 @@ async function moveTask(id, status) {
   const task = tasks.find((item) => item.id === id);
   if (!task || task.status === status) return;
   try {
-    await requestJson(`/api/tasks/${escapePathSegment(id)}`, { method: 'PATCH', body: JSON.stringify({ status }) });
+    await requestJson(`/api/tasks/${escapePathSegment(id)}`, {
+      method: 'PATCH',
+      headers: { 'if-match': `"${task.updatedAt}"` },
+      body: JSON.stringify({ status }),
+    });
     await loadTasks();
     showToast(`Moved to ${statusLabels[status]}`);
   } catch (error) {

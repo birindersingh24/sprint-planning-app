@@ -1,7 +1,7 @@
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { createTaskRecord, updateTaskRecord } from './tasks.js';
+import { createTaskRecord, TaskConflictError, updateTaskRecord } from './tasks.js';
 
 export class JsonTaskRepository {
   #tasks = new Map();
@@ -54,10 +54,11 @@ export class JsonTaskRepository {
     });
   }
 
-  update(id, input) {
+  update(id, input, expectedUpdatedAt) {
     return this.#commit((tasks) => {
       const current = tasks.get(id);
       if (!current) return null;
+      if (expectedUpdatedAt && current.updatedAt !== expectedUpdatedAt) throw new TaskConflictError();
       const task = updateTaskRecord(current, input);
       tasks.set(id, task);
       return { ...task };

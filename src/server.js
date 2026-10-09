@@ -5,7 +5,7 @@ import { extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { JsonTaskRepository } from './repository.js';
 import { sampleTasks } from './seed.js';
-import { TaskValidationError } from './tasks.js';
+import { TaskConflictError, TaskValidationError } from './tasks.js';
 
 const publicDirectory = fileURLToPath(new URL('../public/', import.meta.url));
 const maximumBodyBytes = 64 * 1024;
@@ -18,6 +18,10 @@ const contentTypes = {
 function sendJson(response, statusCode, payload, headers = {}) {
   response.writeHead(statusCode, { 'content-type': 'application/json; charset=utf-8', ...headers });
   response.end(JSON.stringify(payload));
+}
+
+function taskVersionHeader(task) {
+  return { etag: `"${task.updatedAt}"` };
 }
 
 async function readJson(request) {
@@ -96,7 +100,7 @@ export function createAppServer({ store } = {}) {
           }
           if (request.method === 'POST') {
             const task = await store.create(await readJson(request));
-            return sendJson(response, 201, { task });
+            return sendJson(response, 201, { task }, taskVersionHeader(task));
           }
           return sendJson(response, 405, { error: 'Method not allowed' }, { allow: 'GET, POST' });
         }
@@ -106,11 +110,14 @@ export function createAppServer({ store } = {}) {
           const taskId = decodeURIComponent(taskRoute[1]);
           if (request.method === 'GET') {
             const task = await store.get(taskId);
-            return task ? sendJson(response, 200, { task }) : sendJson(response, 404, { error: 'Task not found' });
+            return task ? sendJson(response, 200, { task }, taskVersionHeader(task)) : sendJson(response, 404, { error: 'Task not found' });
           }
           if (request.method === 'PATCH') {
-            const task = await store.update(taskId, await readJson(request));
-            return task ? sendJson(response, 200, { task }) : sendJson(response, 404, { error: 'Task not found' });
+            const ifMatch = request.headers['if-match'];
+            if (!ifMatch) return sendJson(response, 428, { error: 'If-Match is required. Reload the task before saving.' });
+            const expectedUpdatedAt = ifMatch.startsWith('"') && ifMatch.endsWith('"') ? ifMatch.slice(1, -1) : ifMatch;
+            const task = await store.update(taskId, await readJson(request), expectedUpdatedAt);
+            return task ? sendJson(response, 200, { task }, taskVersionHeader(task)) : sendJson(response, 404, { error: 'Task not found' });
           }
           if (request.method === 'DELETE') {
             const task = await store.delete(taskId);
@@ -128,6 +135,9 @@ export function createAppServer({ store } = {}) {
     } catch (error) {
       if (error instanceof TaskValidationError) {
         return sendJson(response, 400, { error: error.message, field: error.field });
+      }
+      if (error instanceof TaskConflictError) {
+        return sendJson(response, 412, { error: error.message, code: 'TASK_VERSION_CONFLICT' });
       }
       console.error('Request failed:', error);
       return sendJson(response, 500, { error: 'Internal server error' });

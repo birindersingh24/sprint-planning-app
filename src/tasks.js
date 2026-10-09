@@ -13,6 +13,13 @@ export class TaskValidationError extends Error {
   }
 }
 
+export class TaskConflictError extends Error {
+  constructor() {
+    super('Task changed since you loaded it. Reload the latest version before saving.');
+    this.name = 'TaskConflictError';
+  }
+}
+
 export function validateTaskInput(input, { partial = false } = {}) {
   if (input === null || typeof input !== 'object' || Array.isArray(input)) {
     throw new TaskValidationError('Request body must be a JSON object', 'body');
@@ -112,9 +119,10 @@ export class TaskStore {
     return { ...task };
   }
 
-  update(id, input) {
+  update(id, input, expectedUpdatedAt) {
     const current = this.#tasks.get(id);
     if (!current) return null;
+    if (expectedUpdatedAt && current.updatedAt !== expectedUpdatedAt) throw new TaskConflictError();
     const updated = updateTaskRecord(current, input);
     this.#tasks.set(id, updated);
     return { ...updated };
