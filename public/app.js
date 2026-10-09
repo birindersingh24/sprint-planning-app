@@ -1,5 +1,15 @@
+import { getAgendaGroup, sortAgendaTasks } from './task-utils.js';
+
 const statuses = ['todo', 'in_progress', 'done'];
 const statusLabels = { todo: 'To do', in_progress: 'In progress', done: 'Done' };
+const agendaGroupOrder = ['overdue', 'today', 'upcoming', 'unscheduled', 'completed'];
+const agendaGroupLabels = {
+  overdue: 'Overdue',
+  today: 'Today',
+  upcoming: 'Upcoming',
+  unscheduled: 'No due date',
+  completed: 'Completed',
+};
 const elements = {
   search: document.querySelector('#search-input'),
   priority: document.querySelector('#priority-filter'),
@@ -15,6 +25,7 @@ const knownAssignees = new Set();
 let searchTimer;
 let toastTimer;
 let loadSequence = 0;
+let activeView = 'board';
 
 function escapePathSegment(value) {
   return encodeURIComponent(value);
@@ -111,6 +122,11 @@ function createTaskCard(task, index) {
 }
 
 function renderBoard() {
+  document.querySelector('.kanban-board').hidden = activeView !== 'board';
+  const agenda = document.querySelector('#agenda-view');
+  agenda.hidden = activeView !== 'agenda';
+  document.querySelector('#agenda-sort-control').hidden = activeView !== 'agenda';
+
   const grouped = Object.fromEntries(statuses.map((status) => [status, tasks.filter((task) => task.status === status)]));
   for (const status of statuses) {
     const list = document.querySelector(`[data-list="${status}"]`);
@@ -122,6 +138,8 @@ function renderBoard() {
       grouped[status].forEach((task, index) => list.append(createTaskCard(task, index)));
     }
   }
+
+  renderAgenda(agenda);
 
   const allCount = tasks.length;
   const doneCount = grouped.done.length;
@@ -142,6 +160,40 @@ function renderBoard() {
     return daysUntilDue >= 0 && daysUntilDue <= 3;
   }).length;
   document.querySelector('#due-count').textContent = `${upcoming} due soon`;
+}
+
+function localDateKey(date = new Date()) {
+  return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
+}
+
+function renderAgenda(container) {
+  container.replaceChildren();
+  const groups = Object.fromEntries(agendaGroupOrder.map((group) => [group, []]));
+  const today = localDateKey();
+  const direction = document.querySelector('#agenda-sort').value;
+
+  for (const task of sortAgendaTasks(tasks, direction)) {
+    groups[getAgendaGroup(task, today)].push(task);
+  }
+
+  let visibleIndex = 0;
+  for (const groupName of agendaGroupOrder) {
+    const groupTasks = groups[groupName];
+    if (groupTasks.length === 0) continue;
+    const section = createElement('section', `agenda-group agenda-${groupName}`);
+    const heading = createElement('header', 'agenda-group-heading');
+    const title = createElement('h2', '', agendaGroupLabels[groupName]);
+    const count = createElement('span', 'column-count', groupTasks.length);
+    heading.append(title, count);
+    const list = createElement('div', 'agenda-task-list');
+    groupTasks.forEach((task) => list.append(createTaskCard(task, visibleIndex++)));
+    section.append(heading, list);
+    container.append(section);
+  }
+
+  if (container.childElementCount === 0) {
+    container.append(createElement('p', 'agenda-empty', 'No tasks match these filters.'));
+  }
 }
 
 function updateAssigneeOptions() {
@@ -255,6 +307,9 @@ document.querySelector('#clear-filters').addEventListener('click', () => {
   elements.assignee.value = '';
   loadTasks();
 });
+document.querySelector('#board-view-button').addEventListener('click', () => setActiveView('board'));
+document.querySelector('#agenda-view-button').addEventListener('click', () => setActiveView('agenda'));
+document.querySelector('#agenda-sort').addEventListener('change', renderBoard);
 document.querySelector('#theme-toggle').addEventListener('click', () => {
   document.body.classList.toggle('dark-theme');
   try {
@@ -286,3 +341,12 @@ try {
   // Storage can be unavailable in restricted browser contexts.
 }
 loadTasks();
+
+function setActiveView(view) {
+  activeView = view;
+  document.querySelector('#board-view-button').classList.toggle('active', view === 'board');
+  document.querySelector('#agenda-view-button').classList.toggle('active', view === 'agenda');
+  document.querySelector('#board-view-button').setAttribute('aria-pressed', String(view === 'board'));
+  document.querySelector('#agenda-view-button').setAttribute('aria-pressed', String(view === 'agenda'));
+  renderBoard();
+}
