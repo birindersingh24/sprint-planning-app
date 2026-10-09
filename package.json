@@ -1,0 +1,15 @@
+{
+  "name": "sprintboard-review-lab",
+  "version": "1.0.0",
+  "private": false,
+  "type": "module",
+  "description": "A small team sprint board for evaluating AI pull-request reviews",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test",
+    "test:watch": "node --test --watch"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
