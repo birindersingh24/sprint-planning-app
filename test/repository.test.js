@@ -56,6 +56,35 @@ test('recovers structurally invalid task records instead of loading them', async
   }
 });
 
+test('logs the quarantine location when writing recovered seed data fails', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'sprintboard-recovery-write-failure-'));
+  const filePath = join(directory, 'tasks.json');
+  const originalContents = '{truncated';
+  const warnings = [];
+  const originalWarn = console.warn;
+  try {
+    await writeFile(filePath, originalContents, 'utf8');
+    console.warn = (message) => warnings.push(message);
+
+    const repository = new JsonTaskRepository(filePath, [{ title: 'Recovered task' }], {
+      writeFileFn: async () => { throw new Error('simulated disk write failure'); },
+    });
+    await assert.rejects(repository.init(), /simulated disk write failure/);
+
+    const files = await readdir(directory);
+    const quarantineFile = files.find((name) => name.startsWith('tasks.json.corrupt-'));
+    assert.ok(quarantineFile);
+    assert.equal(await readFile(join(directory, quarantineFile), 'utf8'), originalContents);
+    assert.equal(files.includes('tasks.json'), false);
+  } finally {
+    console.warn = originalWarn;
+    await rm(directory, { recursive: true, force: true });
+  }
+
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /Original data preserved at .*tasks\.json\.corrupt-/);
+});
+
 test('serializes concurrent writes without losing tasks', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'sprintboard-concurrent-'));
   try {

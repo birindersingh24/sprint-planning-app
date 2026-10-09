@@ -6,10 +6,12 @@ import { createTaskRecord, updateTaskRecord, validateTaskInput } from './tasks.j
 export class JsonTaskRepository {
   #tasks = new Map();
   #writeQueue = Promise.resolve();
+  #writeFile;
 
-  constructor(filePath, seedTasks = []) {
+  constructor(filePath, seedTasks = [], { writeFileFn = writeFile } = {}) {
     this.filePath = resolve(filePath);
     this.seedTasks = seedTasks;
+    this.#writeFile = writeFileFn;
   }
 
   async init() {
@@ -113,16 +115,16 @@ export class JsonTaskRepository {
   async #recoverCorruptData(cause) {
     const quarantinePath = `${this.filePath}.corrupt-${Date.now()}-${process.pid}-${randomUUID()}`;
     await rename(this.filePath, quarantinePath);
+    console.warn(`Sprintboard found invalid task data (${cause.message}). Original data preserved at ${quarantinePath}`);
     const seeded = this.seedTasks.map((input) => createTaskRecord(input));
     this.#tasks = new Map(seeded.map((task) => [task.id, task]));
     await this.#persist(this.#tasks);
-    console.warn(`Sprintboard recovered invalid task data (${cause.message}). Original data preserved at ${quarantinePath}`);
   }
 
   async #persist(tasks) {
     const temporaryPath = `${this.filePath}.${process.pid}.${randomUUID()}.tmp`;
     try {
-      await writeFile(temporaryPath, `${JSON.stringify([...tasks.values()], null, 2)}\n`, 'utf8');
+      await this.#writeFile(temporaryPath, `${JSON.stringify([...tasks.values()], null, 2)}\n`, 'utf8');
       await rename(temporaryPath, this.filePath);
     } catch (error) {
       await rm(temporaryPath, { force: true });
