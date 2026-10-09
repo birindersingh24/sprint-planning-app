@@ -12,6 +12,7 @@ const agendaGroupLabels = {
 };
 const elements = {
   search: document.querySelector('#search-input'),
+  status: document.querySelector('#status-filter'),
   priority: document.querySelector('#priority-filter'),
   assignee: document.querySelector('#assignee-filter'),
   dialog: document.querySelector('#task-dialog'),
@@ -45,6 +46,7 @@ function currentFilters() {
   const parameters = new URLSearchParams();
   const query = elements.search.value.trim();
   if (query) parameters.set('q', query);
+  if (elements.status.value) parameters.set('status', elements.status.value);
   if (elements.priority.value) parameters.set('priority', elements.priority.value);
   if (elements.assignee.value) parameters.set('assignee', elements.assignee.value);
   return parameters.toString();
@@ -295,6 +297,7 @@ document.querySelector('#close-dialog').addEventListener('click', closeTaskDialo
 document.querySelector('#cancel-dialog').addEventListener('click', closeTaskDialog);
 document.querySelector('#delete-task').addEventListener('click', deleteTask);
 elements.form.addEventListener('submit', saveTask);
+elements.status.addEventListener('change', loadTasks);
 elements.priority.addEventListener('change', loadTasks);
 elements.assignee.addEventListener('change', loadTasks);
 elements.search.addEventListener('input', () => {
@@ -303,6 +306,7 @@ elements.search.addEventListener('input', () => {
 });
 document.querySelector('#clear-filters').addEventListener('click', () => {
   elements.search.value = '';
+  elements.status.value = '';
   elements.priority.value = '';
   elements.assignee.value = '';
   loadTasks();
