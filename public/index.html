@@ -66,11 +66,12 @@
         </section>
 
         <section class="board-toolbar" aria-label="Board controls">
-          <div class="view-tabs"><button class="view-tab active" type="button"><span aria-hidden="true">▦</span> Board</button><button class="view-tab" type="button" disabled><span aria-hidden="true">☷</span> List</button></div>
+          <div class="view-tabs" role="group" aria-label="Task view"><button class="view-tab active" id="board-view-button" type="button" aria-pressed="true"><span aria-hidden="true">▦</span> Board</button><button class="view-tab" id="agenda-view-button" type="button" aria-pressed="false"><span aria-hidden="true">☷</span> Agenda</button></div>
           <div class="toolbar-controls">
             <label class="search-control"><span aria-hidden="true">⌕</span><input id="search-input" type="search" placeholder="Search tasks" aria-label="Search tasks"></label>
             <label class="filter-control"><span aria-hidden="true">☷</span><select id="priority-filter" aria-label="Filter by priority"><option value="">Priority</option><option value="high">High priority</option><option value="medium">Medium priority</option><option value="low">Low priority</option></select></label>
             <label class="filter-control assignee-filter"><span aria-hidden="true">♧</span><select id="assignee-filter" aria-label="Filter by assignee"><option value="">Assignee</option></select></label>
+            <label class="filter-control agenda-sort" id="agenda-sort-control" hidden><span aria-hidden="true">↕</span><select id="agenda-sort" aria-label="Sort agenda by due date"><option value="asc">Earliest due</option><option value="desc">Latest due</option></select></label>
             <button class="icon-button filter-reset" id="clear-filters" type="button" aria-label="Clear filters" title="Clear filters">↺</button>
           </div>
         </section>
@@ -92,6 +93,7 @@
             <button class="add-task-link" type="button" data-status="done"><span>＋</span> Add task</button>
           </section>
         </section>
+        <section class="agenda-view" id="agenda-view" aria-label="Tasks by due date" hidden></section>
         <p class="board-footnote"><span class="keyboard-hint">↔</span> Drag a task between columns to update its status</p>
       </main>
     </div>
