@@ -57,6 +57,12 @@ test('creates, filters, reads, updates, and deletes a task over HTTP', async () 
     const filteredResponse = await fetch(`${baseUrl}/api/tasks?priority=high&q=evaluation`);
     assert.equal((await filteredResponse.json()).tasks.length, 1);
 
+    const statusOnlyResponse = await fetch(`${baseUrl}/api/tasks?status=todo`);
+    assert.deepEqual((await statusOnlyResponse.json()).tasks.map((task) => task.id), [created.id]);
+
+    const combinedFilterResponse = await fetch(`${baseUrl}/api/tasks?status=todo&priority=high&assignee=Birinder`);
+    assert.deepEqual((await combinedFilterResponse.json()).tasks.map((task) => task.id), [created.id]);
+
     const readResponse = await fetch(`${baseUrl}/api/tasks/${created.id}`);
     assert.equal((await readResponse.json()).task.title, 'Prepare evaluation notes');
 

@@ -24,7 +24,7 @@ npm test
 
 - Three-column sprint board with drag-and-drop status changes, plus a due-date Agenda view.
 - Create, edit, and delete tasks with title, description, priority, due date, assignee, and label.
-- Search task title, description, and label; filter by priority and assignee.
+- Search task title, description, and label; filter by status, priority, and assignee.
 - Sprint progress, completion count, and due-soon summary.
 - Light and dark themes, with theme preference saved in browser storage.
 - JSON API with validation, 64 KB body limit, method handling, and structured errors.
@@ -57,6 +57,7 @@ Connect Codzee to this public repository, then implement each exercise on a sepa
 1. **Feature (implemented on `feature/due-date-agenda`):** Add due-date sorting and a calendar/agenda view, including accessible sorting controls and tests for missing and past dates.
 2. **Bug fix:** Add optimistic concurrency using an `updatedAt` precondition so two browser sessions cannot silently overwrite each other's edits. Cover stale and current updates at the API level.
 3. **Hardening (implemented on `fix/corrupt-data-recovery`):** Validate and recover from malformed persisted data without overwriting the original file; add a clear startup diagnostic and tests for corrupt, truncated, and structurally invalid records.
+4. **Feature (implemented on `feature/filter-tasks-by-status`):** Filter the board and Agenda by task status, including combinations with search and other filters.
 
 These exercises cover UI behavior, API contracts, and filesystem/data-integrity handling. For each PR, compare Codzee's findings with the tests and your own review. Record useful comments, false positives, missed issues, review latency, and confusing workflow steps. Verify findings yourself; do not treat generated reviews as authoritative.
 
