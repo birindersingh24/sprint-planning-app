@@ -53,6 +53,7 @@ test('creates, filters, reads, updates, and deletes a task over HTTP', async () 
     });
     assert.equal(createdResponse.status, 201);
     const { task: created } = await createdResponse.json();
+    assert.equal(createdResponse.headers.get('etag'), `"${created.updatedAt}"`);
 
     const filteredResponse = await fetch(`${baseUrl}/api/tasks?priority=high&q=evaluation`);
     assert.equal((await filteredResponse.json()).tasks.length, 1);
@@ -62,16 +63,55 @@ test('creates, filters, reads, updates, and deletes a task over HTTP', async () 
 
     const updateResponse = await fetch(`${baseUrl}/api/tasks/${created.id}`, {
       method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', 'if-match': `"${created.updatedAt}"` },
       body: JSON.stringify({ status: 'in_progress' }),
     });
-    assert.equal((await updateResponse.json()).task.status, 'in_progress');
+    const { task: updated } = await updateResponse.json();
+    assert.equal(updated.status, 'in_progress');
 
     const deleteResponse = await fetch(`${baseUrl}/api/tasks/${created.id}`, { method: 'DELETE' });
     assert.equal(deleteResponse.status, 200);
 
     const missingResponse = await fetch(`${baseUrl}/api/tasks/${created.id}`);
     assert.equal(missingResponse.status, 404);
+  });
+});
+
+test('rejects stale task edits without overwriting the latest version', async () => {
+  await withServer(async (baseUrl) => {
+    const createResponse = await fetch(`${baseUrl}/api/tasks`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: 'Concurrent edit example' }),
+    });
+    const { task: created } = await createResponse.json();
+
+    const firstUpdate = await fetch(`${baseUrl}/api/tasks/${created.id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', 'if-match': `"${created.updatedAt}"` },
+      body: JSON.stringify({ title: 'First writer wins' }),
+    });
+    assert.equal(firstUpdate.status, 200);
+    const { task: latest } = await firstUpdate.json();
+
+    const staleUpdate = await fetch(`${baseUrl}/api/tasks/${created.id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', 'if-match': `"${created.updatedAt}"` },
+      body: JSON.stringify({ title: 'Stale writer overwrote data' }),
+    });
+    assert.equal(staleUpdate.status, 412);
+    assert.equal((await staleUpdate.json()).code, 'TASK_VERSION_CONFLICT');
+
+    const missingPrecondition = await fetch(`${baseUrl}/api/tasks/${created.id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ status: 'done' }),
+    });
+    assert.equal(missingPrecondition.status, 428);
+
+    const readResponse = await fetch(`${baseUrl}/api/tasks/${created.id}`);
+    assert.equal((await readResponse.json()).task.title, 'First writer wins');
+    assert.equal(readResponse.headers.get('etag'), `"${latest.updatedAt}"`);
   });
 });
 

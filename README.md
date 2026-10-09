@@ -37,8 +37,10 @@ npm test
 | `GET` | `/api/tasks` | List tasks; optional `q`, `priority`, `assignee`, and `status` filters |
 | `POST` | `/api/tasks` | Create a task |
 | `GET` | `/api/tasks/:id` | Get a task |
-| `PATCH` | `/api/tasks/:id` | Update supplied task fields |
+| `PATCH` | `/api/tasks/:id` | Update supplied task fields using the task's `ETag` in `If-Match` |
 | `DELETE` | `/api/tasks/:id` | Delete a task |
+
+Task reads and creates return an `ETag` based on `updatedAt`. PATCH requires that version in `If-Match`; missing preconditions receive `428`, and stale versions receive `412` without overwriting the latest task.
 
 Task fields are `title` (required, 1-120 characters), `description` (up to 2,000 characters), `status` (`todo`, `in_progress`, or `done`), `priority` (`low`, `medium`, or `high`), `dueDate` (a valid `YYYY-MM-DD` date or `null`), `assignee` (up to 60 characters), and `label` (up to 32 characters).
 
@@ -55,7 +57,7 @@ curl -X POST http://localhost:3000/tasks \
 Connect Codzee to this public repository, then implement each exercise on a separate branch and open a separate pull request. Run `npm test` before each PR.
 
 1. **Feature (implemented on `feature/due-date-agenda`):** Add due-date sorting and a calendar/agenda view, including accessible sorting controls and tests for missing and past dates.
-2. **Bug fix:** Add optimistic concurrency using an `updatedAt` precondition so two browser sessions cannot silently overwrite each other's edits. Cover stale and current updates at the API level.
+2. **Bug fix (implemented on `fix/stale-task-edits`):** Add optimistic concurrency using an `updatedAt` precondition so two browser sessions cannot silently overwrite each other's edits. Cover stale and current updates at the API level.
 3. **Hardening:** Validate and recover from malformed persisted data without overwriting the original file; add a clear startup diagnostic and tests for corrupt, truncated, and structurally invalid records.
 
 These exercises cover UI behavior, API contracts, and filesystem/data-integrity handling. For each PR, compare Codzee's findings with the tests and your own review. Record useful comments, false positives, missed issues, review latency, and confusing workflow steps. Verify findings yourself; do not treat generated reviews as authoritative.
